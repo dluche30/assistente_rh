@@ -1,11 +1,11 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 
 # Carregar chave da OpenAI
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 st.set_page_config(page_title="Assistente RH com IA", layout="wide")
 st.title("🤖 Assistente Virtual de Recrutamento")
@@ -41,11 +41,11 @@ if prompt:
     messages = [system_message] + st.session_state.chat_history
 
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages
         )
-        reply = response["choices"][0]["message"]["content"]
+        reply = response.choices[0].message.content
         st.chat_message("assistant").markdown(reply)
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
 
