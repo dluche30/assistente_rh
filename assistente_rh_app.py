@@ -1,56 +1,53 @@
 import streamlit as st
-import requests
-import csv
+import openai
 import os
 from dotenv import load_dotenv
+
+# Carregar chave da OpenAI
 load_dotenv()
-from datetime import datetime
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-st.set_page_config(page_title="Assistente de RH com IA", layout="centered")
-st.title("👩‍💼 Assistente Virtual de Recrutamento")
-st.markdown("Cole abaixo o texto de um currículo ou descrição pessoal para obter uma análise automatizada de perfil.")
+st.set_page_config(page_title="Assistente RH com IA", layout="wide")
+st.title("🤖 Assistente Virtual de Recrutamento")
 
-API_URL = "https://api.openai.com/v1/chat/completions"
-API_KEY = os.getenv("OPENAI_API_KEY")
-LOG_FILE = "rh_logs.csv"
+# Inicializar histórico da conversa
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-def analisar_perfil(texto_candidato):
-    preamble = (
-        "Você é um assistente virtual especializado em recrutamento e seleção de profissionais na área de tecnologia. "
-        "Seu papel é analisar o conteúdo enviado (currículo ou descrição pessoal), identificar habilidades técnicas e comportamentais, "
-        "avaliar o alinhamento com uma vaga genérica de desenvolvedor de software e sugerir perguntas para uma entrevista. "
-        "Forneça feedback construtivo e sempre estimule o desenvolvimento do candidato. Nunca forneça julgamento definitivo ou discriminatório."
-    )
-    messages = [
-        { "role": "system", "content": preamble },
-        { "role": "user",   "content": texto_candidato }
-    ]
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
+# Mostrar histórico
+for msg in st.session_state.chat_history:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# Entrada do usuário
+prompt = st.chat_input("Descreva seu perfil ou faça uma pergunta sobre recrutamento...")
+
+if prompt:
+    st.chat_message("user").markdown(prompt)
+    st.session_state.chat_history.append({"role": "user", "content": prompt})
+
+    # Preâmbulo (instruções fixas para o modelo)
+    system_message = {
+        "role": "system",
+        "content": (
+            "Você é um assistente de RH especializado em triagem de currículos e orientação profissional. "
+            "Analise perfis profissionais com base em competências, experiências e alinhamento com áreas específicas. "
+            "Evite julgamentos definitivos, incentive o autoconhecimento e ofereça feedback construtivo. "
+            "Seja cordial e objetivo. Em caso de dados insuficientes, peça mais informações ao usuário."
+        )
     }
-    payload = {
-        "model": "gpt-3.5-turbo",
-        "messages": messages,
-        "temperature": 0.6
-    }
-    response = requests.post(API_URL, headers=headers, json=payload)
-    response.raise_for_status()
-    reply = response.json()["choices"][0]["message"]["content"]
-    return reply
 
-def registrar_interacao(texto, resposta):
-    with open(LOG_FILE, mode="a", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([datetime.now().isoformat(), texto, resposta])
+    # Histórico para envio ao modelo
+    messages = [system_message] + st.session_state.chat_history
 
-texto_candidato = st.text_area("Cole aqui o currículo ou descrição do candidato:", height=200)
-if st.button("Analisar perfil") and texto_candidato.strip() != "":
-    with st.spinner("Analisando perfil..."):
-        try:
-            resultado = analisar_perfil(texto_candidato)
-            st.success("Resultado da análise:")
-            st.markdown(resultado)
-            registrar_interacao(texto_candidato, resultado)
-        except Exception as e:
-            st.error(f"Ocorreu um erro: {str(e)}")
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages
+        )
+        reply = response["choices"][0]["message"]["content"]
+        st.chat_message("assistant").markdown(reply)
+        st.session_state.chat_history.append({"role": "assistant", "content": reply})
+
+    except Exception as e:
+        st.error(f"Ocorreu um erro: {e}")
