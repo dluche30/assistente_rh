@@ -8,37 +8,44 @@ import gspread
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
+import fitz  # PyMuPDF para leitura de PDF
 
-# ========= CONFIGURAÇÕES GOOGLE =========
+# ========= CONFIG GOOGLE =========
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets',
           'https://www.googleapis.com/auth/drive']
 
-# Carregar credenciais do Streamlit Secrets
 creds = service_account.Credentials.from_service_account_info(
     json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]),
     scopes=SCOPES
 )
 
-# Google Sheets
 gc = gspread.authorize(creds)
-sheet = gc.open("chat_logs_rh").sheet1
+sheet = gc.open("chat_logs_streamlit").sheet1
 
-# Google Drive
 drive_service = build('drive', 'v3', credentials=creds)
+FOLDER_ID = '1oMSIeD00E3amFjTX4zUW8LfJFctxOMn4'
 
-# 🔗 Coloque aqui o ID da pasta no Drive
-FOLDER_ID = '1oMSIeD00E3amFjTX4zUW8LfJFctxOMn4'  # <-- Substituir pelo seu
-
-# ========= CONFIGURAÇÃO OPENAI =========
+# ========= CONFIG OPENAI =========
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+# ========= FUNÇÃO PARA LER PDF =========
+def extrair_texto_pdf(arquivo_pdf):
+    texto = ""
+    try:
+        with fitz.open(stream=arquivo_pdf.read(), filetype="pdf") as doc:
+            for pagina in doc:
+                texto += pagina.get_text()
+    except Exception as e:
+        st.error(f"Erro ao ler PDF: {e}")
+    return texto
 
 # ========= CARREGAR PREÂMBULO =========
 preambulo_path = "preambulo_assistente.txt"
 if os.path.exists(preambulo_path):
     with open(preambulo_path, "r", encoding="utf-8") as f:
-        preambulo = f.read()
+        preambulo_base = f.read()
 else:
-    preambulo = "Preambulo não encontrado."
+    preambulo_base = "Preambulo não encontrado."
 
 # ========= INTERFACE =========
 st.set_page_config(page_title="Assistente RH UNESP", page_icon="🤖")
@@ -57,8 +64,13 @@ st.session_state.usuario_nome = usuario_nome
 # ========= UPLOAD DE CURRÍCULO =========
 curriculo = st.file_uploader("Envie seu currículo (PDF)", type=["pdf"])
 curriculo_drive_link = ""
+curriculo_texto = ""
 
 if curriculo is not None:
+    # 🔸 Ler o conteúdo do currículo
+    curriculo_texto = extrair_texto_pdf(curriculo)
+
+    # 🔸 Upload para Google Drive
     try:
         file_metadata = {'name': curriculo.name, 'parents': [FOLDER_ID]}
         media = MediaIoBaseUpload(curriculo, mimetype='application/pdf')
@@ -76,6 +88,10 @@ if curriculo is not None:
 
 # ========= HISTÓRICO =========
 if "mensagens" not in st.session_state:
+    preambulo = preambulo_base
+    if curriculo_texto:
+        preambulo += f"\n\nInformações do currículo de {usuario_nome}:\n{curriculo_texto}"
+
     st.session_state.mensagens = [
         {"role": "system", "content": preambulo}
     ]
@@ -97,7 +113,7 @@ if prompt_usuario:
         with st.chat_message("assistant"):
             st.markdown(conteudo)
 
-        # Salvar no Google Sheets
+        # Grava no Google Sheets
         linha_log = [
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             st.session_state.usuario_nome,
