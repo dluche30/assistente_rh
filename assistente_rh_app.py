@@ -4,17 +4,19 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 import gspread
+import json
 from oauth2client.service_account import ServiceAccountCredentials
 
 # Carregar chave da OpenAI
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Autenticar com o Google Sheets
+# Autenticar com o Google Sheets via st.secrets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("rising-precinct-252914-ed9a3a5c5944.json", scope)
+creds_dict = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client_gsheet = gspread.authorize(creds)
-sheet = client_gsheet.open("chat_logs_rh").sheet1  # Nome da sua planilha
+sheet = client_gsheet.open("chat_logs_rh").sheet1  # Nome da planilha
 
 # Interface Streamlit
 st.set_page_config(page_title="Assistente RH com IA", layout="wide")
