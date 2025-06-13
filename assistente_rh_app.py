@@ -21,7 +21,7 @@ sheet = client_gsheet.open("chat_logs_rh").sheet1
 
 # ======== CONFIGURAR INTERFACE ========
 st.set_page_config(page_title="Assistente RH + UNESP", layout="wide")
-st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Logo_unespAzul.png/600px-Logo_unespAzul.png", width=160)
+st.image("logo_unesp.png", width=160)
 st.title("🤖 Assistente Virtual de Recrutamento (UNESP)")
 st.markdown("Este assistente utiliza IA para comparar seu perfil com vagas disponíveis e sugerir a mais compatível.")
 
