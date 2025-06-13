@@ -20,9 +20,9 @@ client_gsheet = gspread.authorize(creds)
 sheet = client_gsheet.open("chat_logs_rh").sheet1
 
 # ======== CONFIGURAR INTERFACE ========
-st.set_page_config(page_title="Assistente RH + UNESP", layout="wide")
+st.set_page_config(page_title="Assistente RH + Claudia Regina de Freitas", layout="wide")
 st.image("logo_unesp.png", width=400)
-st.title("🤖 Assistente Virtual de Recrutamento (UNESP)")
+st.title("🤖 Assistente Virtual de Recrutamento")
 st.markdown("Este assistente utiliza IA para comparar seu perfil com vagas disponíveis e sugerir a mais compatível.")
 
 # ======== IDENTIFICAÇÃO DO USUÁRIO ========
