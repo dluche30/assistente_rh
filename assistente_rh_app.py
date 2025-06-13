@@ -21,6 +21,16 @@ st.image("logo_unesp.png", width=400)
 st.title("Assistente Virtual de Recrutamento UNESP")
 st.markdown("Este assistente simula uma triagem inicial de candidatos com base em vagas disponíveis.")
 
+# Campo para o nome do usuário
+usuario_nome = st.text_input("Digite seu nome:", value=st.session_state.get("usuario_nome", ""))
+if usuario_nome:
+    st.session_state.usuario_nome = usuario_nome
+
+# Upload de currículo (opcional)
+curriculo = st.file_uploader("Envie seu currículo (PDF)", type=["pdf"])
+if curriculo is not None:
+    st.success(f"Currículo recebido: {curriculo.name}")
+
 # Inicializa o histórico de mensagens na sessão
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = [
@@ -48,8 +58,10 @@ if prompt_usuario:
         # Registra no log
         log = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "nome": st.session_state.get("usuario_nome", ""),
             "usuario": prompt_usuario,
-            "assistente": conteudo
+            "assistente": conteudo,
+            "curriculo_nome": curriculo.name if curriculo else ""
         }
         if os.path.exists("chat_logs.csv"):
             df_log = pd.read_csv("chat_logs.csv")
