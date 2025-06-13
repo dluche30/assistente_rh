@@ -2,13 +2,21 @@ import streamlit as st
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
-import csv
 from datetime import datetime
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # Carregar chave da OpenAI
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# Autenticar com o Google Sheets
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("rising-precinct-252914-ed9a3a5c5944.json", scope)
+client_gsheet = gspread.authorize(creds)
+sheet = client_gsheet.open("chat_logs_rh").sheet1  # Nome da sua planilha
+
+# Interface Streamlit
 st.set_page_config(page_title="Assistente RH com IA", layout="wide")
 st.title("🤖 Assistente Virtual de Recrutamento")
 
@@ -24,14 +32,6 @@ if not st.session_state.usuario:
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Caminho para o log CSV
-LOG_FILE = "chat_logs.csv"
-
-def salvar_log(usuario, prompt, resposta):
-    with open(LOG_FILE, mode="a", encoding="utf-8", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow([datetime.now(), usuario, prompt, resposta])
-
 # Mostrar histórico
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
@@ -40,11 +40,14 @@ for msg in st.session_state.chat_history:
 # Entrada do usuário
 prompt = st.chat_input("Descreva seu perfil ou faça uma pergunta sobre recrutamento...")
 
+def salvar_no_google_sheets(usuario, prompt, resposta):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sheet.append_row([timestamp, usuario, prompt, resposta])
+
 if prompt:
     st.chat_message("user").markdown(prompt)
     st.session_state.chat_history.append({"role": "user", "content": prompt})
 
-    # Preâmbulo
     system_message = {
         "role": "system",
         "content": (
@@ -65,7 +68,7 @@ if prompt:
         reply = response.choices[0].message.content
         st.chat_message("assistant").markdown(reply)
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
-        salvar_log(st.session_state.usuario, prompt, reply)
+        salvar_no_google_sheets(st.session_state.usuario, prompt, reply)
 
     except Exception as e:
         st.error(f"Ocorreu um erro: {e}")
