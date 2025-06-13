@@ -7,40 +7,67 @@ import gspread
 import json
 from oauth2client.service_account import ServiceAccountCredentials
 
-# Carregar chave da OpenAI
+# ======== CONFIGURAÇÕES DE AMBIENTE ========
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Autenticar com o Google Sheets via st.secrets
+# ======== AUTENTICAÇÃO GOOGLE SHEETS ========
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds_dict = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client_gsheet = gspread.authorize(creds)
-sheet = client_gsheet.open("chat_logs_rh").sheet1  # Nome da planilha
+sheet = client_gsheet.open("chat_logs_rh").sheet1
 
-# Interface Streamlit
-st.set_page_config(page_title="Assistente RH com IA", layout="wide")
-st.title("🤖 Assistente Virtual de Recrutamento")
+# ======== CONFIGURAÇÕES DE PÁGINA ========
+st.set_page_config(page_title="Assistente de Recrutamento IA", layout="wide")
 
-# Identificação do usuário
+# ======== ESTILO ========
+st.markdown("""
+    <style>
+        .reportview-container {
+            background: #f7f9fc;
+        }
+        .stChatInput input {
+            border: 2px solid #4b8bbe;
+            border-radius: 8px;
+        }
+        .stChatMessage {
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .stButton>button {
+            background-color: #4b8bbe;
+            color: white;
+            border-radius: 8px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# ======== CABEÇALHO ========
+st.title("🤖 Assistente Virtual de Recrutamento com IA")
+st.markdown("Bem-vindo! Este assistente usa IA para ajudar na triagem e orientação profissional. Seja claro em suas perguntas ou descreva seu perfil para receber sugestões.")
+
+# ======== IDENTIFICAÇÃO DO USUÁRIO ========
 if "usuario" not in st.session_state:
     st.session_state.usuario = ""
 
 if not st.session_state.usuario:
-    st.session_state.usuario = st.text_input("Digite seu nome ou RA para iniciar:", key="user_input")
+    st.session_state.usuario = st.text_input("🔑 Digite seu nome ou RA para iniciar:", key="user_input")
     st.stop()
 
-# Inicializar histórico da conversa
+# ======== HISTÓRICO DE CONVERSA ========
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Mostrar histórico
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Entrada do usuário
-prompt = st.chat_input("Descreva seu perfil ou faça uma pergunta sobre recrutamento...")
+# ======== INPUT DO USUÁRIO ========
+prompt = st.chat_input("🗣️ Escreva aqui sua dúvida ou apresente seu perfil...")
 
 def salvar_no_google_sheets(usuario, prompt, resposta):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -54,9 +81,8 @@ if prompt:
         "role": "system",
         "content": (
             "Você é um assistente de RH especializado em triagem de currículos e orientação profissional. "
-            "Analise perfis profissionais com base em competências, experiências e alinhamento com áreas específicas. "
-            "Evite julgamentos definitivos, incentive o autoconhecimento e ofereça feedback construtivo. "
-            "Seja cordial e objetivo. Em caso de dados insuficientes, peça mais informações ao usuário."
+            "Analise perfis com base em competências e experiências. Incentive o autoconhecimento e ofereça feedback construtivo. "
+            "Peça mais informações se necessário e evite julgamentos definitivos."
         )
     }
 
