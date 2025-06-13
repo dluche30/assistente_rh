@@ -1,87 +1,67 @@
 import streamlit as st
 from openai import OpenAI
 import os
-from dotenv import load_dotenv
 from datetime import datetime
-import gspread
-import json
 import pandas as pd
-from oauth2client.service_account import ServiceAccountCredentials
 
-# ======== CONFIGURAR API OPENAI ========
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Inicializa o cliente OpenAI
+client = OpenAI()
 
-# ======== AUTENTICAÇÃO GOOGLE SHEETS ========
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds_dict = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client_gsheet = gspread.authorize(creds)
-sheet = client_gsheet.open("chat_logs_rh").sheet1
-
-# ======== CONFIGURAR INTERFACE ========
-st.set_page_config(page_title="Assistente RH + Claudia Regina de Freitas", layout="wide")
-st.image("logo_unesp.png", width=400)
-st.title("🤖 Assistente Virtual de Recrutamento")
-st.markdown("Este assistente utiliza IA para comparar seu perfil com vagas disponíveis e sugerir a mais compatível.")
-
-# ======== IDENTIFICAÇÃO DO USUÁRIO ========
-if "usuario" not in st.session_state:
-    st.session_state.usuario = ""
-
-if not st.session_state.usuario:
-    st.session_state.usuario = st.text_input("🔑 Digite seu nome ou RA para iniciar:", key="user_input")
-    st.stop()
-
-# ======== HISTÓRICO DE CONVERSA ========
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-# ======== CARREGAR ARQUIVO DE VAGAS ========
-vagas_path = "vagas_exemplo.csv"
-if os.path.exists(vagas_path):
-    df_vagas = pd.read_csv(vagas_path)
-    lista_vagas = "\n".join([f"- {row['cargo']}: {row['requisitos']}" for _, row in df_vagas.iterrows()])
+# Carrega o preâmbulo a partir do arquivo externo
+preambulo_path = "preambulo_assistente.txt"
+if os.path.exists(preambulo_path):
+    with open(preambulo_path, "r", encoding="utf-8") as f:
+        preambulo = f.read()
 else:
-    lista_vagas = "Nenhuma vaga disponível no momento."
+    preambulo = "Preambulo não encontrado. Por favor, verifique o arquivo 'preambulo_assistente.txt'."
 
-# ======== MOSTRAR CONVERSAS ANTERIORES ========
-for msg in st.session_state.chat_history:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Interface
+st.set_page_config(page_title="Assistente Virtual de Recrutamento UNESP", page_icon="🤖")
+st.image("logo_unesp.png", width=400)
+st.title("Assistente Virtual de Recrutamento UNESP")
+st.markdown("Este assistente simula uma triagem inicial de candidatos com base em vagas disponíveis.")
 
-# ======== INPUT DO USUÁRIO ========
-prompt = st.chat_input("🗣️ Escreva aqui sua dúvida ou descreva seu perfil profissional...")
+# Inicializa o histórico de mensagens na sessão
+if "mensagens" not in st.session_state:
+    st.session_state.mensagens = [
+        {"role": "system", "content": preambulo}
+    ]
 
-def salvar_no_google_sheets(usuario, prompt, resposta):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    sheet.append_row([timestamp, usuario, prompt, resposta])
+# Campo de entrada do usuário
+prompt_usuario = st.chat_input("Digite sua mensagem...")
 
-if prompt:
-    st.chat_message("user").markdown(prompt)
-    st.session_state.chat_history.append({"role": "user", "content": prompt})
-
-    system_message = {
-        "role": "system",
-        "content": (
-            f"Você é um assistente de RH da UNESP. Seu papel é comparar perfis com as vagas disponíveis e indicar a mais compatível.\n"
-            f"As vagas atuais são:\n{lista_vagas}\n"
-            "Considere sempre os requisitos de cada vaga e a descrição fornecida pelo usuário. "
-            "Se não houver correspondência clara, sugira uma trilha de capacitação."
-        )
-    }
-
-    messages = [system_message] + st.session_state.chat_history
+if prompt_usuario:
+    st.session_state.mensagens.append({"role": "user", "content": prompt_usuario})
 
     try:
-        response = client.chat.completions.create(
+        resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=messages
+            messages=st.session_state.mensagens
         )
-        reply = response.choices[0].message.content
-        st.chat_message("assistant").markdown(reply)
-        st.session_state.chat_history.append({"role": "assistant", "content": reply})
-        salvar_no_google_sheets(st.session_state.usuario, prompt, reply)
+        conteudo = resposta.choices[0].message.content
+        st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
+
+        # Exibe a resposta
+        with st.chat_message("assistant"):
+            st.markdown(conteudo)
+
+        # Registra no log
+        log = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "usuario": prompt_usuario,
+            "assistente": conteudo
+        }
+        if os.path.exists("chat_logs.csv"):
+            df_log = pd.read_csv("chat_logs.csv")
+            df_log = pd.concat([df_log, pd.DataFrame([log])], ignore_index=True)
+        else:
+            df_log = pd.DataFrame([log])
+        df_log.to_csv("chat_logs.csv", index=False)
 
     except Exception as e:
-        st.error(f"Ocorreu um erro: {e}")
+        st.error(f"Ocorreu um erro: {str(e)}")
+
+# Exibe a conversa
+for msg in st.session_state.mensagens[1:]:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
