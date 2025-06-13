@@ -5,9 +5,10 @@ from dotenv import load_dotenv
 from datetime import datetime
 import gspread
 import json
+import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 
-# ======== CONFIGURAÇÕES DE AMBIENTE ========
+# ======== CONFIGURAR API OPENAI ========
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -18,37 +19,11 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client_gsheet = gspread.authorize(creds)
 sheet = client_gsheet.open("chat_logs_rh").sheet1
 
-# ======== CONFIGURAÇÕES DE PÁGINA ========
-st.set_page_config(page_title="Assistente de Recrutamento IA", layout="wide")
-
-# ======== ESTILO ========
-st.markdown("""
-    <style>
-        .reportview-container {
-            background: #f7f9fc;
-        }
-        .stChatInput input {
-            border: 2px solid #4b8bbe;
-            border-radius: 8px;
-        }
-        .stChatMessage {
-            background-color: #ffffff;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        .stButton>button {
-            background-color: #4b8bbe;
-            color: white;
-            border-radius: 8px;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# ======== CABEÇALHO ========
-st.title("🤖 Assistente Virtual de Recrutamento com IA")
-st.markdown("Bem-vindo! Este assistente usa IA para ajudar na triagem e orientação profissional. Seja claro em suas perguntas ou descreva seu perfil para receber sugestões.")
+# ======== CONFIGURAR INTERFACE ========
+st.set_page_config(page_title="Assistente RH + UNESP", layout="wide")
+st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Logo_unespAzul.png/600px-Logo_unespAzul.png", width=160)
+st.title("🤖 Assistente Virtual de Recrutamento (UNESP)")
+st.markdown("Este assistente utiliza IA para comparar seu perfil com vagas disponíveis e sugerir a mais compatível.")
 
 # ======== IDENTIFICAÇÃO DO USUÁRIO ========
 if "usuario" not in st.session_state:
@@ -62,12 +37,21 @@ if not st.session_state.usuario:
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
+# ======== CARREGAR ARQUIVO DE VAGAS ========
+vagas_path = "vagas_exemplo.csv"
+if os.path.exists(vagas_path):
+    df_vagas = pd.read_csv(vagas_path)
+    lista_vagas = "\n".join([f"- {row['cargo']}: {row['requisitos']}" for _, row in df_vagas.iterrows()])
+else:
+    lista_vagas = "Nenhuma vaga disponível no momento."
+
+# ======== MOSTRAR CONVERSAS ANTERIORES ========
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 # ======== INPUT DO USUÁRIO ========
-prompt = st.chat_input("🗣️ Escreva aqui sua dúvida ou apresente seu perfil...")
+prompt = st.chat_input("🗣️ Escreva aqui sua dúvida ou descreva seu perfil profissional...")
 
 def salvar_no_google_sheets(usuario, prompt, resposta):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -80,9 +64,10 @@ if prompt:
     system_message = {
         "role": "system",
         "content": (
-            "Você é um assistente de RH especializado em triagem de currículos e orientação profissional. "
-            "Analise perfis com base em competências e experiências. Incentive o autoconhecimento e ofereça feedback construtivo. "
-            "Peça mais informações se necessário e evite julgamentos definitivos."
+            f"Você é um assistente de RH da UNESP. Seu papel é comparar perfis com as vagas disponíveis e indicar a mais compatível.\n"
+            f"As vagas atuais são:\n{lista_vagas}\n"
+            "Considere sempre os requisitos de cada vaga e a descrição fornecida pelo usuário. "
+            "Se não houver correspondência clara, sugira uma trilha de capacitação."
         )
     }
 
