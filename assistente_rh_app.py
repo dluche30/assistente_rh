@@ -17,6 +17,23 @@ import numpy as np
 import pandas as pd
 import re
 
+def texto_para_num(valor):
+    mapa = {"Alto": 100, "Médio": 60, "Baixo": 20}
+    return mapa.get(str(valor).strip().capitalize(), 0)
+
+def tabela_markdown_para_df(tabela_texto):
+    import pandas as pd
+    import re
+    linhas = [linha.strip() for linha in tabela_texto.strip().split('\n') if linha.strip() and not linha.startswith("|-")]
+    dados = [re.split(r"\s*\|\s*", linha.strip("|")) for linha in linhas]
+    colunas = dados[0]
+    dados_linhas = dados[1:]
+    df = pd.DataFrame(dados_linhas, columns=colunas)
+    for col in colunas[1:]:
+        df[col] = df[col].apply(texto_para_num)
+    return df
+
+
 
 # ----------------------------------------------------------------------
 # CONFIGURAÇÕES GERAIS
