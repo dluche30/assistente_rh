@@ -159,10 +159,8 @@ def processar_entrada(prompt_usuario: str):
     
 except Exception as e:
     st.warning(f"Não foi possível gerar o gráfico de radar automaticamente: {e}")
-    if 'tabela_markdown' in locals() and tabela_markdown:
-        st.markdown(tabela_markdown)
-    else:
-        st.info("Nenhuma tabela de aderência foi retornada pelo assistente.")
+    if 'tabela_markdown' in locals() and tabela_markdown:        st.markdown(tabela_markdown)
+    else:        st.info("Nenhuma tabela de aderência foi retornada pelo assistente.")
 
 
 
