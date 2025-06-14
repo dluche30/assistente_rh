@@ -115,11 +115,7 @@ if st.button("🔍 Ler currículos selecionados"):
         for nome in curriculo_selecionados:
             file_id = next(c['id'] for c in curriculos if c['name'] == nome)
             texto = baixar_e_ler_curriculo(file_id, nome)
-            texto_curriculos += f"
-
-===== {nome} =====
-{texto}
-"
+            texto_curriculos += f"\n\n===== {nome} =====\n{texto}\n"
         st.success("Conteúdo dos currículos lido com sucesso!")
         st.text_area("📝 Conteúdo dos currículos selecionados:", texto_curriculos, height=400)
     else:
@@ -128,28 +124,17 @@ if st.button("🔍 Ler currículos selecionados"):
 if st.button("📥 Ler TODOS os currículos do Drive"):
     for c in curriculos:
         texto = baixar_e_ler_curriculo(c['id'], c['name'])
-        texto_curriculos += f"
-
-===== {c['name']} =====
-{texto}
-"
+        texto_curriculos += f"\n\n===== {c['name']} =====\n{texto}\n"
     st.success("Todos os currículos foram lidos com sucesso!")
     st.text_area("📝 Conteúdo de TODOS os currículos:", texto_curriculos, height=500)
 
 # ========= HISTÓRICO =========
 if "mensagens" not in st.session_state:
-    preambulo = "Você é um assistente de RH. Ajude na análise de currículos.
-
-"
+    preambulo = "Você é um assistente de RH. Ajude na análise de currículos.\n\n"
     if texto_curriculos:
-        preambulo += f"Informações dos currículos analisados:
-{texto_curriculos}
-"
+        preambulo += f"Informações dos currículos analisados:\n{texto_curriculos}\n"
     if texto_vagas:
-        preambulo += f"
-As vagas disponíveis são:
-{texto_vagas}
-"
+        preambulo += f"\nAs vagas disponíveis são:\n{texto_vagas}\n"
     st.session_state.mensagens = [{"role": "system", "content": preambulo}]
 
 # ========= CHAT =========
