@@ -231,10 +231,11 @@ except Exception:
 
 st.subheader("⚙️ Configurações do Assistente")
 modelo_ia = st.selectbox(
-    key="selecao_modelo",
     "Escolha o modelo de IA para análise:",
-    options=["gpt-4", "gpt-3.5-turbo"],
-    index=1
+    "Escolha o modelo de IA para análise:",
+        options=["gpt-4", "gpt-3.5-turbo"],
+    index=1,
+    key="selecao_modelo"
 )
 
 
