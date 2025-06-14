@@ -134,6 +134,35 @@ if "mensagens" not in st.session_state:
     st.session_state.mensagens = [{"role": "system", "content": ""}]
     atualizar_prompt()
 
+
+def gerar_tabela_aderencia(curriculos_texto, vagas_texto):
+    prompt = f"""
+Você é um assistente de recrutamento. Com base nas vagas abaixo e nos currículos fornecidos, gere uma tabela que mostre a aderência de cada candidato para cada vaga.
+
+- Liste os nomes dos candidatos nas linhas.
+- Liste as vagas nas colunas.
+- Utilize critérios como: correspondência de competências, experiências, formações e requisitos da vaga.
+
+Apresente os dados em formato de tabela, atribuindo um nível de aderência (ex.: Alto, Médio, Baixo) ou uma pontuação de 0 a 100, se possível.
+
+Currículos analisados:
+{curriculos_texto}
+
+Vagas disponíveis:
+{vagas_texto}
+"""
+
+    resposta = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": st.session_state.mensagens[0]["content"]},
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    return resposta.choices[0].message.content
+
+
 # ----------------------------------------------------------------------
 # INTERFACE
 # ----------------------------------------------------------------------
@@ -191,6 +220,23 @@ with col_to:
             ler_curriculo_drive(c["id"], c["name"])
         atualizar_prompt()
         st.success("Todos os currículos lidos!")
+
+
+# ---- Geração de Tabela de Aderência ----
+st.subheader("📊 Análise de Aderência Currículo vs Vagas")
+if st.button("🔍 Gerar Tabela de Aderência"):
+
+    if not st.session_state.texto_curriculos or not st.session_state.texto_vagas:
+        st.warning("Por favor, carregue currículos e vagas antes de gerar a análise.")
+    else:
+        with st.spinner("Analisando currículos e vagas..."):
+            tabela = gerar_tabela_aderencia(
+                st.session_state.texto_curriculos,
+                st.session_state.texto_vagas
+            )
+            st.subheader("🔍 Resultado da Análise de Aderência")
+            st.markdown(tabela)
+
 
 # ---- Campo de entrada do usuário ----
 prompt_usuario = st.chat_input("Digite sua mensagem para o assistente...")
