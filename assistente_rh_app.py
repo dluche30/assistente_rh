@@ -4,11 +4,12 @@ import os
 from datetime import datetime
 import pandas as pd
 import json
+import io
+import fitz  # PyMuPDF
 import gspread
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
-import fitz  # PyMuPDF para leitura de PDF
+from googleapiclient.http import MediaIoBaseDownload
 
 # ========= CONFIG GOOGLE =========
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets',
@@ -28,32 +29,41 @@ FOLDER_ID = '1oMSIeD00E3amFjTX4zUW8LfJFctxOMn4'
 # ========= CONFIG OPENAI =========
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# ========= FUNÇÃO PARA LER PDF =========
-def extrair_texto_pdf(arquivo_pdf):
+# ========= FUNÇÕES UTILITÁRIAS =========
+def extrair_texto_pdf(file_bytes):
     texto = ""
     try:
-        with fitz.open(stream=arquivo_pdf.read(), filetype="pdf") as doc:
+        with fitz.open(stream=file_bytes, filetype="pdf") as doc:
             for pagina in doc:
                 texto += pagina.get_text()
     except Exception as e:
         st.error(f"Erro ao ler PDF: {e}")
     return texto
 
-# ========= CARREGAR PREÂMBULO =========
-preambulo_path = "preambulo_assistente.txt"
-if os.path.exists(preambulo_path):
-    with open(preambulo_path, "r", encoding="utf-8") as f:
-        preambulo_base = f.read()
-else:
-    preambulo_base = "Preambulo não encontrado."
+def listar_curriculos_drive():
+    results = drive_service.files().list(
+        q=f"'{FOLDER_ID}' in parents and mimeType='application/pdf'",
+        fields="files(id, name)"
+    ).execute()
+    return results.get('files', [])
+
+def baixar_e_ler_curriculo(file_id, file_name):
+    request = drive_service.files().get_media(fileId=file_id)
+    file_data = io.BytesIO()
+    downloader = MediaIoBaseDownload(file_data, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+    file_data.seek(0)
+    texto = extrair_texto_pdf(file_data.read())
+    return texto
 
 # ========= INTERFACE =========
 st.set_page_config(page_title="Assistente RH UNESP", page_icon="🤖")
 st.image("logo_unesp.png", width=400)
 st.title("Assistente Virtual de Recrutamento - UNESP")
-st.markdown("Preencha seus dados, envie seu currículo e converse com nosso assistente!")
+st.markdown("Você pode analisar múltiplos currículos armazenados no Google Drive.")
 
-# ========= NOME DO USUÁRIO =========
 usuario_nome = st.text_input("Digite seu nome completo:")
 if not usuario_nome:
     st.warning("Por favor, preencha seu nome para iniciar.")
@@ -61,40 +71,38 @@ if not usuario_nome:
 
 st.session_state.usuario_nome = usuario_nome
 
-# ========= UPLOAD DE CURRÍCULO =========
-curriculo = st.file_uploader("Envie seu currículo (PDF)", type=["pdf"])
-curriculo_drive_link = ""
-curriculo_texto = ""
+# ========= LER CURRÍCULOS =========
+st.subheader("📄 Currículos no Google Drive")
+curriculos = listar_curriculos_drive()
+curriculo_nomes = [c['name'] for c in curriculos]
+curriculo_selecionados = st.multiselect("Selecione os currículos para análise:", curriculo_nomes)
 
-if curriculo is not None:
-    # 🔸 Ler o conteúdo do currículo
-    curriculo_texto = extrair_texto_pdf(curriculo)
+texto_curriculos = ""
 
-    # 🔸 Upload para Google Drive
-    try:
-        file_metadata = {'name': curriculo.name, 'parents': [FOLDER_ID]}
-        media = MediaIoBaseUpload(curriculo, mimetype='application/pdf')
-        uploaded = drive_service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id, webViewLink'
-        ).execute()
-        file_id = uploaded.get('id')
-        curriculo_drive_link = uploaded.get('webViewLink')
-        st.success(f"Currículo enviado com sucesso: [Abrir no Drive]({curriculo_drive_link})")
+if st.button("🔍 Ler currículos selecionados"):
+    if curriculo_selecionados:
+        for nome in curriculo_selecionados:
+            file_id = next(c['id'] for c in curriculos if c['name'] == nome)
+            texto = baixar_e_ler_curriculo(file_id, nome)
+            texto_curriculos += f"\n\n===== {nome} =====\n{texto}\n"
+        st.success("Conteúdo dos currículos lido com sucesso!")
+        st.text_area("📝 Conteúdo dos currículos selecionados:", texto_curriculos, height=400)
+    else:
+        st.warning("Selecione pelo menos um currículo.")
 
-    except Exception as e:
-        st.error(f"Erro ao enviar currículo: {e}")
+if st.button("📥 Ler TODOS os currículos do Drive"):
+    for c in curriculos:
+        texto = baixar_e_ler_curriculo(c['id'], c['name'])
+        texto_curriculos += f"\n\n===== {c['name']} =====\n{texto}\n"
+    st.success("Todos os currículos foram lidos com sucesso!")
+    st.text_area("📝 Conteúdo de TODOS os currículos:", texto_curriculos, height=500)
 
 # ========= HISTÓRICO =========
 if "mensagens" not in st.session_state:
-    preambulo = preambulo_base
-    if curriculo_texto:
-        preambulo += f"\n\nInformações do currículo de {usuario_nome}:\n{curriculo_texto}"
-
-    st.session_state.mensagens = [
-        {"role": "system", "content": preambulo}
-    ]
+    preambulo = "Você é um assistente de RH. Ajude na análise de currículos.\n\n"
+    if texto_curriculos:
+        preambulo += f"Informações dos currículos analisados:\n{texto_curriculos}\n"
+    st.session_state.mensagens = [{"role": "system", "content": preambulo}]
 
 # ========= CHAT =========
 prompt_usuario = st.chat_input("Digite sua mensagem para o assistente...")
@@ -113,13 +121,12 @@ if prompt_usuario:
         with st.chat_message("assistant"):
             st.markdown(conteudo)
 
-        # Grava no Google Sheets
         linha_log = [
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             st.session_state.usuario_nome,
             prompt_usuario,
             conteudo,
-            curriculo_drive_link
+            ", ".join(curriculo_selecionados) if curriculo_selecionados else "Todos"
         ]
         sheet.append_row(linha_log)
 
