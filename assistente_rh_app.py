@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 import json
 import io
-import fitz  # PyMuPDF
+import fitz
 import gspread
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -85,6 +85,16 @@ if not usuario_nome:
 
 st.session_state.usuario_nome = usuario_nome
 
+# ========= LEITURA DO ARQUIVO DE VAGAS =========
+try:
+    vagas_df = pd.read_csv("vagas_exemplo.csv")
+    texto_vagas = vagas_df.to_string(index=False)
+    st.subheader("📑 Vagas disponíveis")
+    st.dataframe(vagas_df)
+except Exception as e:
+    texto_vagas = ""
+    st.warning("Arquivo vagas_exemplo.csv não encontrado ou com erro.")
+
 # ========= UPLOAD DE CURRÍCULO =========
 st.subheader("📤 Enviar novo currículo para o Google Drive")
 file_uploaded = st.file_uploader("Selecione um currículo (PDF) para enviar", type=["pdf"])
@@ -105,7 +115,11 @@ if st.button("🔍 Ler currículos selecionados"):
         for nome in curriculo_selecionados:
             file_id = next(c['id'] for c in curriculos if c['name'] == nome)
             texto = baixar_e_ler_curriculo(file_id, nome)
-            texto_curriculos += f"\n\n===== {nome} =====\n{texto}\n"
+            texto_curriculos += f"
+
+===== {nome} =====
+{texto}
+"
         st.success("Conteúdo dos currículos lido com sucesso!")
         st.text_area("📝 Conteúdo dos currículos selecionados:", texto_curriculos, height=400)
     else:
@@ -114,15 +128,28 @@ if st.button("🔍 Ler currículos selecionados"):
 if st.button("📥 Ler TODOS os currículos do Drive"):
     for c in curriculos:
         texto = baixar_e_ler_curriculo(c['id'], c['name'])
-        texto_curriculos += f"\n\n===== {c['name']} =====\n{texto}\n"
+        texto_curriculos += f"
+
+===== {c['name']} =====
+{texto}
+"
     st.success("Todos os currículos foram lidos com sucesso!")
     st.text_area("📝 Conteúdo de TODOS os currículos:", texto_curriculos, height=500)
 
 # ========= HISTÓRICO =========
 if "mensagens" not in st.session_state:
-    preambulo = "Você é um assistente de RH. Ajude na análise de currículos.\n\n"
+    preambulo = "Você é um assistente de RH. Ajude na análise de currículos.
+
+"
     if texto_curriculos:
-        preambulo += f"Informações dos currículos analisados:\n{texto_curriculos}\n"
+        preambulo += f"Informações dos currículos analisados:
+{texto_curriculos}
+"
+    if texto_vagas:
+        preambulo += f"
+As vagas disponíveis são:
+{texto_vagas}
+"
     st.session_state.mensagens = [{"role": "system", "content": preambulo}]
 
 # ========= CHAT =========
