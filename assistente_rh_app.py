@@ -200,6 +200,7 @@ Vagas disponíveis:
     st.error("❌ Não foi possível gerar a tabela após várias tentativas devido ao limite da API.")
     return "Erro: Limite da API OpenAI atingido."
 
+
 # ----------------------------------------------------------------------
 # ESTADO INICIAL
 # ----------------------------------------------------------------------
@@ -207,9 +208,16 @@ st.session_state.setdefault("texto_curriculos", "")
 st.session_state.setdefault("texto_vagas", "")
 st.session_state.setdefault("sugestoes_exibidas", False)
 if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{"role": "system", "content": "\n
-Sempre que gerar uma tabela de aderência para análise automática, devolva **apenas** a tabela markdown, sem legenda, título, comentários ou texto extra."}]
+    st.session_state.mensagens = [{
+        "role": "system",
+        "content": (
+            "Você é um assistente virtual de RH. "
+            "Ajude na análise de currículos de múltiplos candidatos, gerando tabelas de aderência, cruzamento com vagas, resumos e sugestões de ocupação. "
+            "Sempre que gerar uma tabela de aderência para análise automática, devolva APENAS a tabela markdown, sem legenda, título, comentários ou texto extra."
+        )
+    }]
     atualizar_prompt()
+
 
 # ----------------------------------------------------------------------
 # SIDEBAR - CONFIGURAÇÕES E UPLOADS
