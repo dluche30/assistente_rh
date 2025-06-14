@@ -1,20 +1,31 @@
+# app_rh_assistente.py
 import streamlit as st
 from openai import OpenAI
-import os, json, io
+import os, json, io, logging
 from datetime import datetime
 import pandas as pd
-import fitz                   # PyMuPDF
+import fitz                             # PyMuPDF
 import gspread
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
-# ========= CONFIG GOOGLE =========
+# ----------------------------------------------------------------------
+# CONFIGURAÇÕES GERAIS
+# ----------------------------------------------------------------------
+st.set_page_config(page_title="Assistente Virtual de Recrutamento", page_icon="🤖")
+
+# ⬇️  logging básico (aparecerá no terminal ou em Cloud Run, etc.)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+
+# -------- OPENAI --------
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+# -------- GOOGLE --------
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-
 creds = service_account.Credentials.from_service_account_info(
     json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]),
     scopes=SCOPES
@@ -22,12 +33,12 @@ creds = service_account.Credentials.from_service_account_info(
 gc = gspread.authorize(creds)
 sheet = gc.open("chat_logs_rh").sheet1
 drive_service = build("drive", "v3", credentials=creds)
+
 FOLDER_ID = "1oMSIeD00E3amFjTX4zUW8LfJFctxOMn4"
 
-# ========= CONFIG OPENAI =========
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-# ========= FUNÇÕES UTILITÁRIAS =========
+# ----------------------------------------------------------------------
+# FUNÇÕES UTILITÁRIAS
+# ----------------------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def extrair_texto_pdf(file_bytes: bytes) -> str:
     texto = ""
@@ -43,7 +54,7 @@ def listar_curriculos_drive():
     ).execute()
     return res.get("files", [])
 
-def baixar_curriculo(file_id):
+def baixar_curriculo(file_id: str) -> bytes:
     request = drive_service.files().get_media(fileId=file_id)
     file_data = io.BytesIO()
     downloader = MediaIoBaseDownload(file_data, request)
@@ -53,12 +64,10 @@ def baixar_curriculo(file_id):
     file_data.seek(0)
     return file_data.read()
 
-def ler_curriculo_drive(file_id, nome):
+def ler_curriculo_drive(file_id: str, nome: str):
     pdf_bytes = baixar_curriculo(file_id)
     texto = extrair_texto_pdf(pdf_bytes)
-    # ---- Persistir no estado ----
     st.session_state.texto_curriculos += f"\n\n===== {nome} =====\n{texto}"
-    return texto
 
 def upload_curriculo(file_uploaded):
     meta = {"name": file_uploaded.name, "parents": [FOLDER_ID]}
@@ -72,7 +81,7 @@ def upload_curriculo(file_uploaded):
     )
 
 def atualizar_prompt():
-    """Reconstrói a primeira mensagem 'system'."""
+    """Reconstrói a primeira mensagem do sistema com vagas + currículos."""
     preambulo = (
         "Você é um assistente de RH. Ajude na análise de currículos.\n\n"
         f"Informações dos currículos analisados:\n{st.session_state.texto_curriculos}\n\n"
@@ -80,71 +89,16 @@ def atualizar_prompt():
     )
     st.session_state.mensagens[0]["content"] = preambulo
 
-# ========= INTERFACE =========
-st.set_page_config(page_title="Assistente Virtual de Recrutamento", page_icon="🤖")
-st.image("logo_unesp.png", width=400)
-st.title("Assistente Virtual de Recrutamento")
-st.markdown("Você pode analisar múltiplos currículos armazenados no Google Drive.")
+def mostrar_historico():
+    """Renderiza o chat do segundo elemento em diante (0 = system)."""
+    for msg in st.session_state.mensagens[1:]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-usuario_nome = st.text_input("Digite seu nome completo:")
-if not usuario_nome:
-    st.warning("Por favor, preencha seu nome para iniciar.")
-    st.stop()
-st.session_state.usuario_nome = usuario_nome
-
-# ========= CARREGAR VAGAS =========
-try:
-    vagas_df = pd.read_csv("vagas_exemplo.csv")
-    st.subheader("📑 Vagas disponíveis")
-    st.dataframe(vagas_df)
-    st.session_state.texto_vagas = vagas_df.to_string(index=False)
-except Exception:
-    st.session_state.texto_vagas = ""
-    st.warning("Arquivo de vagas não encontrado ou com erro.")
-
-# ========= ESTADO INICIAL =========
-st.session_state.setdefault("texto_curriculos", "")
-if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{"role": "system", "content": ""}]
-    atualizar_prompt()  # cria o preâmbulo inicial
-
-# ========= UPLOAD DE CURRÍCULO =========
-st.subheader("📤 Enviar novo currículo para o Google Drive")
-file_uploaded = st.file_uploader(
-    "Selecione um currículo (PDF) para enviar", type=["pdf"]
-)
-if file_uploaded and st.button("🚀 Enviar currículo"):
-    upload_curriculo(file_uploaded)
-
-# ========= LER CURRÍCULOS =========
-st.subheader("📄 Currículos no Google Drive")
-curriculos = listar_curriculos_drive()
-nomes = [c["name"] for c in curriculos]
-selecionados = st.multiselect("Selecione os currículos para análise:", nomes)
-
-if st.button("🔍 Ler currículos selecionados"):
-    if not selecionados:
-        st.warning("Selecione pelo menos um currículo.")
-    else:
-        for nome in selecionados:
-            file_id = next(c["id"] for c in curriculos if c["name"] == nome)
-            ler_curriculo_drive(file_id, nome)
-        atualizar_prompt()
-        st.success("Conteúdo lido e armazenado na memória!")
-        st.text_area("📝 Currículos lidos:", st.session_state.texto_curriculos, height=400)
-
-if st.button("📥 Ler TODOS os currículos"):
-    for c in curriculos:
-        ler_curriculo_drive(c["id"], c["name"])
-    atualizar_prompt()
-    st.success("Todos os currículos lidos!")
-    st.text_area("📝 Currículos lidos:", st.session_state.texto_curriculos, height=500)
-
-# ========= CHAT =========
-prompt_usuario = st.chat_input("Digite sua mensagem para o assistente...")
-if prompt_usuario:
+def processar_entrada(prompt_usuario: str):
+    """Anexa a pergunta, chama a API, salva resposta e força rerun."""
     st.session_state.mensagens.append({"role": "user", "content": prompt_usuario})
-    atualizar_prompt()               # garante prompt atualizado antes da chamada
+    atualizar_prompt()
 
     try:
         resposta = client.chat.completions.create(
@@ -154,22 +108,91 @@ if prompt_usuario:
         conteudo = resposta.choices[0].message.content
         st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
 
-        with st.chat_message("assistant"):
-            st.markdown(conteudo)
-
-        # LOG
+        # LOG planilha Google Sheets
         sheet.append_row([
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            usuario_nome,
+            st.session_state.usuario_nome,
             prompt_usuario,
             conteudo,
-            ", ".join(selecionados) if selecionados else "Todos"
         ])
 
     except Exception as e:
-        st.error(f"Ocorreu um erro: {e}")
+        logging.error("Erro na chamada ao modelo: %s", e, exc_info=True)
+        st.session_state.mensagens.append({
+            "role": "assistant",
+            "content": "Desculpe, ocorreu um erro ao processar sua solicitação."
+        })
 
-# ========= EXIBIR HISTÓRICO =========
-for msg in st.session_state.mensagens[1:]:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    st.rerun()   # evita duplicação de mensagens e simplifica fluxo
+
+# ----------------------------------------------------------------------
+# ESTADO INICIAL
+# ----------------------------------------------------------------------
+st.session_state.setdefault("texto_curriculos", "")
+st.session_state.setdefault("texto_vagas", "")
+if "mensagens" not in st.session_state:
+    st.session_state.mensagens = [{"role": "system", "content": ""}]
+    atualizar_prompt()
+
+# ----------------------------------------------------------------------
+# INTERFACE
+# ----------------------------------------------------------------------
+st.image("logo_unesp.png", width=300)
+st.title("Assistente Virtual de Recrutamento")
+
+# ---- Nome do usuário ----
+usuario_nome = st.text_input("Digite seu nome completo:", key="nome_usuario_input")
+if not usuario_nome:
+    st.warning("Por favor, preencha seu nome para iniciar.")
+    st.stop()
+st.session_state.usuario_nome = usuario_nome
+
+# ---- Carregar vagas ----
+try:
+    vagas_df = pd.read_csv("vagas_exemplo.csv")
+    st.subheader("📑 Vagas disponíveis")
+    st.dataframe(vagas_df)
+    st.session_state.texto_vagas = vagas_df.to_string(index=False)
+except Exception:
+    st.warning("Arquivo de vagas não encontrado.")
+    st.session_state.texto_vagas = ""
+
+# ---- HISTÓRICO DO CHAT (antes do input) ----
+st.divider()
+mostrar_historico()
+st.divider()
+
+# ---- Upload de currículo ----
+with st.expander("📤 Enviar novo currículo (PDF) para o Google Drive"):
+    file_uploaded = st.file_uploader("Selecione o arquivo", type=["pdf"])
+    if file_uploaded and st.button("🚀 Enviar"):
+        upload_curriculo(file_uploaded)
+
+# ---- Ler currículos ----
+st.subheader("📄 Currículos no Google Drive")
+curriculos = listar_curriculos_drive()
+nomes = [c["name"] for c in curriculos]
+selecionados = st.multiselect("Selecione currículos para análise:", nomes)
+
+col_le, col_to = st.columns(2)
+with col_le:
+    if st.button("🔍 Ler currículos selecionados"):
+        if not selecionados:
+            st.warning("Selecione pelo menos um currículo.")
+        else:
+            for nome in selecionados:
+                file_id = next(c["id"] for c in curriculos if c["name"] == nome)
+                ler_curriculo_drive(file_id, nome)
+            atualizar_prompt()
+            st.success("Currículos lidos e armazenados na memória!")
+with col_to:
+    if st.button("📥 Ler TODOS os currículos"):
+        for c in curriculos:
+            ler_curriculo_drive(c["id"], c["name"])
+        atualizar_prompt()
+        st.success("Todos os currículos lidos!")
+
+# ---- Campo de entrada do usuário ----
+prompt_usuario = st.chat_input("Digite sua mensagem para o assistente...")
+if prompt_usuario:
+    processar_entrada(prompt_usuario)
