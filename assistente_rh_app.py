@@ -231,6 +231,7 @@ except Exception:
 
 st.subheader("⚙️ Configurações do Assistente")
 modelo_ia = st.selectbox(
+    key="selecao_modelo",
     "Escolha o modelo de IA para análise:",
     options=["gpt-4", "gpt-3.5-turbo"],
     index=1
@@ -275,7 +276,7 @@ with col_to:
 
 # ---- Geração de Tabela de Aderência ----
 st.subheader("📊 Análise de Aderência Currículo vs Vagas")
-if st.button("🔍 Gerar Tabela de Aderência"):
+if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia"):
 
     if not st.session_state.texto_curriculos or not st.session_state.texto_vagas:
         st.warning("Por favor, carregue currículos e vagas antes de gerar a análise.")
@@ -292,7 +293,7 @@ if st.button("🔍 Gerar Tabela de Aderência"):
 
 # ---- Geração de Tabela de Aderência ----
 st.subheader("📊 Análise de Aderência Currículo vs Vagas")
-if st.button("🔍 Gerar Tabela de Aderência"):
+if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia"):
 
     if not st.session_state.texto_curriculos or not st.session_state.texto_vagas:
         st.warning("Por favor, carregue currículos e vagas antes de gerar a análise.")
