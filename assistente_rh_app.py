@@ -164,6 +164,10 @@ except Exception as e:
     else:
         st.info("Nenhuma tabela de aderência foi retornada pelo assistente.")
 
+
+
+
+
 # ---- Campo de entrada do usuário (chat) ----
 prompt_usuario = st.chat_input("Digite sua mensagem para o assistente...")
 if prompt_usuario:
