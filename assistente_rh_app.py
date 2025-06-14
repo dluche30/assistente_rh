@@ -17,6 +17,15 @@ import numpy as np
 import pandas as pd
 import re
 
+def extrair_tabela_markdown(texto):
+    import re
+    tabelas = re.findall(r'((?:\|.*\n)+)', texto)
+    if tabelas:
+        return tabelas[0]
+    else:
+        return ""
+
+
 def texto_para_num(valor):
     mapa = {"Alto": 100, "Médio": 60, "Baixo": 20}
     return mapa.get(str(valor).strip().capitalize(), 0)
@@ -24,6 +33,15 @@ def texto_para_num(valor):
 def tabela_markdown_para_df(tabela_texto):
     import pandas as pd
     import re
+
+def extrair_tabela_markdown(texto):
+    import re
+    tabelas = re.findall(r'((?:\|.*\n)+)', texto)
+    if tabelas:
+        return tabelas[0]
+    else:
+        return ""
+
     linhas = [linha.strip() for linha in tabela_texto.strip().split('\n')
               if linha.strip() and not set(linha.replace('|','').replace('-','')) == set()]
     dados = [re.split(r"\s*\|\s*", linha.strip("|")) for linha in linhas]
@@ -189,7 +207,9 @@ st.session_state.setdefault("texto_curriculos", "")
 st.session_state.setdefault("texto_vagas", "")
 st.session_state.setdefault("sugestoes_exibidas", False)
 if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{"role": "system", "content": ""}]
+    st.session_state.mensagens = [{"role": "system", "content": "\n
+Sempre que gerar uma tabela de aderência para análise automática, devolva **apenas** a tabela markdown, sem legenda, título, comentários ou texto extra.
+"}]
     atualizar_prompt()
 
 # ----------------------------------------------------------------------
@@ -270,21 +290,24 @@ if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia_principal")
                 modelo_ia
             )
             
+
 try:
-    df_aderencia = tabela_markdown_para_df(tabela)
-    st.write("Shape do df_aderencia:", df_aderencia.shape)
-    st.write("Colunas:", df_aderencia.columns)
-    st.write("Primeiras linhas:", df_aderencia.head())
-    if df_aderencia.shape[1] > 2:
-        st.subheader("🔍 Resultado da Análise de Aderência")
-        st.dataframe(df_aderencia)
-        st.subheader("📈 Gráfico de Radar")
-        plot_radar_aderencia(df_aderencia)
+    tabela_markdown = extrair_tabela_markdown(tabela)
+    if tabela_markdown:
+        df_aderencia = tabela_markdown_para_df(tabela_markdown)
+        if df_aderencia.shape[1] > 2:
+            st.subheader("🔍 Resultado da Análise de Aderência")
+            st.dataframe(df_aderencia)
+            st.subheader("📈 Gráfico de Radar")
+            plot_radar_aderencia(df_aderencia)
+        else:
+            st.warning("Tabela convertida tem só 1 coluna útil. Reveja a formatação da tabela de aderência.")
     else:
-        st.warning("Tabela convertida tem só 1 coluna útil. Reveja a formatação da tabela de aderência.")
+        st.warning("Tabela de aderência não encontrada no texto do assistente. Peça para a IA retornar apenas a tabela markdown, sem legenda ou texto extra.")
 except Exception as e:
     st.warning(f"Não foi possível gerar o gráfico de radar automaticamente: {e}")
     st.markdown(tabela)
+
 
 
 
