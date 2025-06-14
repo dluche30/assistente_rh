@@ -24,14 +24,20 @@ def texto_para_num(valor):
 def tabela_markdown_para_df(tabela_texto):
     import pandas as pd
     import re
-    linhas = [linha.strip() for linha in tabela_texto.strip().split('\n') if linha.strip() and not linha.startswith("|-")]
+    linhas = [linha.strip() for linha in tabela_texto.strip().split('\n')
+              if linha.strip() and not set(linha.replace('|','').replace('-','')) == set()]
     dados = [re.split(r"\s*\|\s*", linha.strip("|")) for linha in linhas]
+    # Filtra linhas pelo mesmo número de colunas do cabeçalho
     colunas = dados[0]
-    dados_linhas = dados[1:]
+    dados_linhas = [linha for linha in dados[1:] if len(linha) == len(colunas)]
     df = pd.DataFrame(dados_linhas, columns=colunas)
     for col in colunas[1:]:
         df[col] = df[col].apply(texto_para_num)
     return df
+
+
+
+
 
 
 
@@ -263,15 +269,23 @@ if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia_principal")
                 st.session_state.texto_vagas,
                 modelo_ia
             )
-            try:
-                df_aderencia = tabela_markdown_para_df(tabela)
-                st.subheader("🔍 Resultado da Análise de Aderência")
-                st.dataframe(df_aderencia)
-                st.subheader("📈 Gráfico de Radar")
-                plot_radar_aderencia(df_aderencia)
-            except Exception as e:
-                st.warning(f"Não foi possível gerar o gráfico de radar automaticamente: {e}")
-                st.markdown(tabela)
+            
+try:
+    df_aderencia = tabela_markdown_para_df(tabela)
+    st.write("Shape do df_aderencia:", df_aderencia.shape)
+    st.write("Colunas:", df_aderencia.columns)
+    st.write("Primeiras linhas:", df_aderencia.head())
+    if df_aderencia.shape[1] > 2:
+        st.subheader("🔍 Resultado da Análise de Aderência")
+        st.dataframe(df_aderencia)
+        st.subheader("📈 Gráfico de Radar")
+        plot_radar_aderencia(df_aderencia)
+    else:
+        st.warning("Tabela convertida tem só 1 coluna útil. Reveja a formatação da tabela de aderência.")
+except Exception as e:
+    st.warning(f"Não foi possível gerar o gráfico de radar automaticamente: {e}")
+    st.markdown(tabela)
+
 
 
 # ---- Campo de entrada do usuário (chat) ----
