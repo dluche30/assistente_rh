@@ -1,4 +1,4 @@
-# app_rh_assistente.py
+
 import streamlit as st
 from openai import OpenAI
 import os, json, io, logging
@@ -9,19 +9,18 @@ import gspread
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+import time
+import openai
 
 # ----------------------------------------------------------------------
 # CONFIGURAÇÕES GERAIS
 # ----------------------------------------------------------------------
 st.set_page_config(page_title="Assistente Virtual de Recrutamento", page_icon="🤖")
 
-# ⬇️  logging básico (aparecerá no terminal ou em Cloud Run, etc.)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-# -------- OPENAI --------
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# -------- GOOGLE --------
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -81,25 +80,21 @@ def upload_curriculo(file_uploaded):
     )
 
 def atualizar_prompt():
-    """Reconstrói a primeira mensagem do sistema com vagas + currículos."""
     preambulo = (
-        "Você é um assistente de RH. Ajude na análise de currículos.\n\n"
+        "Você é um assistente virtual de RH. Ajude na análise de currículos de múltiplos candidatos, gerando tabelas de aderência, cruzamento com vagas, resumos e sugestões de ocupação. \n\n"
         f"Informações dos currículos analisados:\n{st.session_state.texto_curriculos}\n\n"
         f"As vagas disponíveis são:\n{st.session_state.texto_vagas}"
     )
     st.session_state.mensagens[0]["content"] = preambulo
 
 def mostrar_historico():
-    """Renderiza o chat do segundo elemento em diante (0 = system)."""
     for msg in st.session_state.mensagens[1:]:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
 def processar_entrada(prompt_usuario: str):
-    """Anexa a pergunta, chama a API, salva resposta e força rerun."""
     st.session_state.mensagens.append({"role": "user", "content": prompt_usuario})
     atualizar_prompt()
-
     try:
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -108,64 +103,19 @@ def processar_entrada(prompt_usuario: str):
         conteudo = resposta.choices[0].message.content
         st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
 
-        # LOG planilha Google Sheets
         sheet.append_row([
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             st.session_state.usuario_nome,
             prompt_usuario,
             conteudo,
         ])
-
     except Exception as e:
         logging.error("Erro na chamada ao modelo: %s", e, exc_info=True)
         st.session_state.mensagens.append({
             "role": "assistant",
             "content": "Desculpe, ocorreu um erro ao processar sua solicitação."
         })
-
-    st.rerun()   # evita duplicação de mensagens e simplifica fluxo
-
-# ----------------------------------------------------------------------
-# ESTADO INICIAL
-# ----------------------------------------------------------------------
-st.session_state.setdefault("texto_curriculos", "")
-st.session_state.setdefault("texto_vagas", "")
-if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{"role": "system", "content": ""}]
-    atualizar_prompt()
-
-
-def gerar_tabela_aderencia(curriculos_texto, vagas_texto):
-    prompt = f"""
-Você é um assistente de recrutamento. Com base nas vagas abaixo e nos currículos fornecidos, gere uma tabela que mostre a aderência de cada candidato para cada vaga.
-
-- Liste os nomes dos candidatos nas linhas.
-- Liste as vagas nas colunas.
-- Utilize critérios como: correspondência de competências, experiências, formações e requisitos da vaga.
-
-Apresente os dados em formato de tabela, atribuindo um nível de aderência (ex.: Alto, Médio, Baixo) ou uma pontuação de 0 a 100, se possível.
-
-Currículos analisados:
-{curriculos_texto}
-
-Vagas disponíveis:
-{vagas_texto}
-"""
-
-    resposta = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": st.session_state.mensagens[0]["content"]},
-            {"role": "user", "content": prompt}
-        ]
-    )
-
-    return resposta.choices[0].message.content
-
-
-
-import time
-import openai
+    st.rerun()
 
 def gerar_tabela_aderencia(curriculos_texto, vagas_texto, modelo_ia):
     prompt = f"""
@@ -200,62 +150,68 @@ Vagas disponíveis:
             wait_time = 2 ** tentativa
             st.warning(f"⚠️ Limite atingido. Tentando novamente em {wait_time} segundos...")
             time.sleep(wait_time)
-
     st.error("❌ Não foi possível gerar a tabela após várias tentativas devido ao limite da API.")
     return "Erro: Limite da API OpenAI atingido."
 
+# ----------------------------------------------------------------------
+# ESTADO INICIAL
+# ----------------------------------------------------------------------
+st.session_state.setdefault("texto_curriculos", "")
+st.session_state.setdefault("texto_vagas", "")
+st.session_state.setdefault("sugestoes_exibidas", False)
+if "mensagens" not in st.session_state:
+    st.session_state.mensagens = [{"role": "system", "content": ""}]
+    atualizar_prompt()
 
 # ----------------------------------------------------------------------
-# INTERFACE
+# SIDEBAR - CONFIGURAÇÕES E UPLOADS
 # ----------------------------------------------------------------------
-st.image("logo_unesp.png", width=300)
+with st.sidebar:
+    st.image("logo_unesp.png", width=200)
+    st.header("Configurações")
+    modelo_ia = st.selectbox(
+        "Escolha o modelo de IA para análise:",
+        options=["gpt-4", "gpt-3.5-turbo"],
+        index=1,
+        key="selecao_modelo_sidebar"
+    )
+
+    usuario_nome = st.text_input("Digite seu nome completo:", key="nome_usuario_input_sidebar")
+    if not usuario_nome:
+        st.warning("Por favor, preencha seu nome para iniciar.")
+        st.stop()
+    st.session_state.usuario_nome = usuario_nome
+
+    st.subheader("📤 Enviar novo currículo (PDF) para o Google Drive")
+    file_uploaded = st.file_uploader("Selecione o arquivo", type=["pdf"], key="upload_curriculo_sidebar")
+    if file_uploaded and st.button("🚀 Enviar", key="enviar_curriculo_sidebar"):
+        upload_curriculo(file_uploaded)
+
+    st.subheader("📑 Vagas disponíveis (CSV local)")
+    try:
+        vagas_df = pd.read_csv("vagas_exemplo.csv")
+        st.dataframe(vagas_df)
+        st.session_state.texto_vagas = vagas_df.to_string(index=False)
+    except Exception:
+        st.warning("Arquivo de vagas não encontrado.")
+        st.session_state.texto_vagas = ""
+
+# ----------------------------------------------------------------------
+# PAINEL PRINCIPAL
+# ----------------------------------------------------------------------
 st.title("Assistente Virtual de Recrutamento")
 
-# ---- Nome do usuário ----
-usuario_nome = st.text_input("Digite seu nome completo:", key="nome_usuario_input")
-if not usuario_nome:
-    st.warning("Por favor, preencha seu nome para iniciar.")
-    st.stop()
-st.session_state.usuario_nome = usuario_nome
-
-# ---- Carregar vagas ----
-try:
-    vagas_df = pd.read_csv("vagas_exemplo.csv")
-    st.subheader("📑 Vagas disponíveis")
-    st.dataframe(vagas_df)
-    st.session_state.texto_vagas = vagas_df.to_string(index=False)
-except Exception:
-    st.warning("Arquivo de vagas não encontrado.")
-    st.session_state.texto_vagas = ""
-
-
-st.subheader("⚙️ Configurações do Assistente")
-modelo_ia = st.selectbox(
-    "Escolha o modelo de IA para análise:",
-    options=["gpt-4", "gpt-3.5-turbo"],
-    index=1,
-    key="selecao_modelo")
-
-# ---- HISTÓRICO DO CHAT (antes do input) ----
 st.divider()
 mostrar_historico()
 st.divider()
 
-# ---- Upload de currículo ----
-with st.expander("📤 Enviar novo currículo (PDF) para o Google Drive"):
-    file_uploaded = st.file_uploader("Selecione o arquivo", type=["pdf"])
-    if file_uploaded and st.button("🚀 Enviar"):
-        upload_curriculo(file_uploaded)
-
-# ---- Ler currículos ----
 st.subheader("📄 Currículos no Google Drive")
 curriculos = listar_curriculos_drive()
 nomes = [c["name"] for c in curriculos]
-selecionados = st.multiselect("Selecione currículos para análise:", nomes)
-
+selecionados = st.multiselect("Selecione currículos para análise:", nomes, key="multiselect_curriculos")
 col_le, col_to = st.columns(2)
 with col_le:
-    if st.button("🔍 Ler currículos selecionados"):
+    if st.button("🔍 Ler currículos selecionados", key="botao_ler_selecionados"):
         if not selecionados:
             st.warning("Selecione pelo menos um currículo.")
         else:
@@ -265,34 +221,15 @@ with col_le:
             atualizar_prompt()
             st.success("Currículos lidos e armazenados na memória!")
 with col_to:
-    if st.button("📥 Ler TODOS os currículos"):
+    if st.button("📥 Ler TODOS os currículos", key="botao_ler_todos"):
         for c in curriculos:
             ler_curriculo_drive(c["id"], c["name"])
         atualizar_prompt()
         st.success("Todos os currículos lidos!")
 
-
 # ---- Geração de Tabela de Aderência ----
 st.subheader("📊 Análise de Aderência Currículo vs Vagas")
-if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia"):
-
-    if not st.session_state.texto_curriculos or not st.session_state.texto_vagas:
-        st.warning("Por favor, carregue currículos e vagas antes de gerar a análise.")
-    else:
-        with st.spinner("Analisando currículos e vagas..."):
-            tabela = gerar_tabela_aderencia(
-                st.session_state.texto_curriculos,
-                st.session_state.texto_vagas
-            )
-            st.subheader("🔍 Resultado da Análise de Aderência")
-            st.markdown(tabela)
-
-
-
-# ---- Geração de Tabela de Aderência ----
-st.subheader("📊 Análise de Aderência Currículo vs Vagas")
-if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia"):
-
+if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia_principal"):
     if not st.session_state.texto_curriculos or not st.session_state.texto_vagas:
         st.warning("Por favor, carregue currículos e vagas antes de gerar a análise.")
     else:
@@ -305,8 +242,7 @@ if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia"):
             st.subheader("🔍 Resultado da Análise de Aderência")
             st.markdown(tabela)
 
-
-# ---- Campo de entrada do usuário ----
+# ---- Campo de entrada do usuário (chat) ----
 prompt_usuario = st.chat_input("Digite sua mensagem para o assistente...")
 if prompt_usuario:
     processar_entrada(prompt_usuario)
