@@ -163,6 +163,48 @@ Vagas disponíveis:
     return resposta.choices[0].message.content
 
 
+
+import time
+import openai
+
+def gerar_tabela_aderencia(curriculos_texto, vagas_texto, modelo_ia):
+    prompt = f"""
+Você é um assistente de recrutamento. Com base nas vagas abaixo e nos currículos fornecidos, gere uma tabela que mostre a aderência de cada candidato para cada vaga.
+
+- Liste os nomes dos candidatos nas linhas.
+- Liste as vagas nas colunas.
+- Utilize critérios como: correspondência de competências, experiências, formações e requisitos da vaga.
+
+Apresente os dados em formato de tabela, atribuindo um nível de aderência (ex.: Alto, Médio, Baixo) ou uma pontuação de 0 a 100, se possível.
+
+Currículos analisados:
+{curriculos_texto}
+
+Vagas disponíveis:
+{vagas_texto}
+"""
+
+    tentativas = 5
+    for tentativa in range(tentativas):
+        try:
+            resposta = client.chat.completions.create(
+                model=modelo_ia,
+                messages=[
+                    {"role": "system", "content": st.session_state.mensagens[0]["content"]},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return resposta.choices[0].message.content
+
+        except openai.RateLimitError:
+            wait_time = 2 ** tentativa
+            st.warning(f"⚠️ Limite atingido. Tentando novamente em {wait_time} segundos...")
+            time.sleep(wait_time)
+
+    st.error("❌ Não foi possível gerar a tabela após várias tentativas devido ao limite da API.")
+    return "Erro: Limite da API OpenAI atingido."
+
+
 # ----------------------------------------------------------------------
 # INTERFACE
 # ----------------------------------------------------------------------
@@ -185,6 +227,15 @@ try:
 except Exception:
     st.warning("Arquivo de vagas não encontrado.")
     st.session_state.texto_vagas = ""
+
+
+st.subheader("⚙️ Configurações do Assistente")
+modelo_ia = st.selectbox(
+    "Escolha o modelo de IA para análise:",
+    options=["gpt-4", "gpt-3.5-turbo"],
+    index=1
+)
+
 
 # ---- HISTÓRICO DO CHAT (antes do input) ----
 st.divider()
@@ -233,6 +284,24 @@ if st.button("🔍 Gerar Tabela de Aderência"):
             tabela = gerar_tabela_aderencia(
                 st.session_state.texto_curriculos,
                 st.session_state.texto_vagas
+            )
+            st.subheader("🔍 Resultado da Análise de Aderência")
+            st.markdown(tabela)
+
+
+
+# ---- Geração de Tabela de Aderência ----
+st.subheader("📊 Análise de Aderência Currículo vs Vagas")
+if st.button("🔍 Gerar Tabela de Aderência"):
+
+    if not st.session_state.texto_curriculos or not st.session_state.texto_vagas:
+        st.warning("Por favor, carregue currículos e vagas antes de gerar a análise.")
+    else:
+        with st.spinner("Analisando currículos e vagas..."):
+            tabela = gerar_tabela_aderencia(
+                st.session_state.texto_curriculos,
+                st.session_state.texto_vagas,
+                modelo_ia
             )
             st.subheader("🔍 Resultado da Análise de Aderência")
             st.markdown(tabela)
