@@ -208,8 +208,7 @@ st.session_state.setdefault("texto_vagas", "")
 st.session_state.setdefault("sugestoes_exibidas", False)
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = [{"role": "system", "content": "\n
-Sempre que gerar uma tabela de aderência para análise automática, devolva **apenas** a tabela markdown, sem legenda, título, comentários ou texto extra.
-"}]
+Sempre que gerar uma tabela de aderência para análise automática, devolva **apenas** a tabela markdown, sem legenda, título, comentários ou texto extra."}]
     atualizar_prompt()
 
 # ----------------------------------------------------------------------
