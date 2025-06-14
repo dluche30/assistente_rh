@@ -20,7 +20,7 @@ creds = service_account.Credentials.from_service_account_info(
 )
 
 gc = gspread.authorize(creds)
-sheet = gc.open("chat_logs_streamlit").sheet1
+sheet = gc.open("chat_logs_rh").sheet1
 
 drive_service = build('drive', 'v3', credentials=creds)
 FOLDER_ID = '1oMSIeD00E3amFjTX4zUW8LfJFctxOMn4'
