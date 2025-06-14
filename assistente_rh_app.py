@@ -9,7 +9,7 @@ import fitz  # PyMuPDF
 import gspread
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 # ========= CONFIG GOOGLE =========
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets',
@@ -29,7 +29,7 @@ FOLDER_ID = '1oMSIeD00E3amFjTX4zUW8LfJFctxOMn4'
 # ========= CONFIG OPENAI =========
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# ========= FUNÇÕES UTILITÁRIAS =========
+# ========= FUNÇÕES =========
 def extrair_texto_pdf(file_bytes):
     texto = ""
     try:
@@ -58,10 +58,24 @@ def baixar_e_ler_curriculo(file_id, file_name):
     texto = extrair_texto_pdf(file_data.read())
     return texto
 
+def upload_curriculo(file_uploaded):
+    try:
+        file_metadata = {'name': file_uploaded.name, 'parents': [FOLDER_ID]}
+        media = MediaIoBaseUpload(file_uploaded, mimetype='application/pdf')
+        uploaded = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, webViewLink'
+        ).execute()
+        link = uploaded.get('webViewLink')
+        st.success(f"Currículo {file_uploaded.name} enviado com sucesso! [Abrir no Drive]({link})")
+    except Exception as e:
+        st.error(f"Erro ao enviar currículo: {e}")
+
 # ========= INTERFACE =========
-st.set_page_config(page_title="Assistente RH UNESP", page_icon="🤖")
+st.set_page_config(page_title="Assistente Virtual de Recrutamento", page_icon="🤖")
 st.image("logo_unesp.png", width=400)
-st.title("Assistente Virtual de Recrutamento - UNESP")
+st.title("Assistente Virtual de Recrutamento")
 st.markdown("Você pode analisar múltiplos currículos armazenados no Google Drive.")
 
 usuario_nome = st.text_input("Digite seu nome completo:")
@@ -70,6 +84,13 @@ if not usuario_nome:
     st.stop()
 
 st.session_state.usuario_nome = usuario_nome
+
+# ========= UPLOAD DE CURRÍCULO =========
+st.subheader("📤 Enviar novo currículo para o Google Drive")
+file_uploaded = st.file_uploader("Selecione um currículo (PDF) para enviar", type=["pdf"])
+if file_uploaded is not None:
+    if st.button("🚀 Enviar currículo para o Drive"):
+        upload_curriculo(file_uploaded)
 
 # ========= LER CURRÍCULOS =========
 st.subheader("📄 Currículos no Google Drive")
