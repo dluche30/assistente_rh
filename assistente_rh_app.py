@@ -12,6 +12,12 @@ from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import time
 import openai
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import re
+
+
 # ----------------------------------------------------------------------
 # CONFIGURAÇÕES GERAIS
 # ----------------------------------------------------------------------
@@ -228,6 +234,7 @@ with col_to:
         st.success("Todos os currículos lidos!")
 
 # ---- Geração de Tabela de Aderência ----
+
 st.subheader("📊 Análise de Aderência Currículo vs Vagas")
 if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia_principal"):
     if not st.session_state.texto_curriculos or not st.session_state.texto_vagas:
@@ -239,8 +246,16 @@ if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia_principal")
                 st.session_state.texto_vagas,
                 modelo_ia
             )
-            st.subheader("🔍 Resultado da Análise de Aderência")
-            st.markdown(tabela)
+            try:
+                df_aderencia = tabela_markdown_para_df(tabela)
+                st.subheader("🔍 Resultado da Análise de Aderência")
+                st.dataframe(df_aderencia)
+                st.subheader("📈 Gráfico de Radar")
+                plot_radar_aderencia(df_aderencia)
+            except Exception as e:
+                st.warning(f"Não foi possível gerar o gráfico de radar automaticamente: {e}")
+                st.markdown(tabela)
+
 
 # ---- Campo de entrada do usuário (chat) ----
 prompt_usuario = st.chat_input("Digite sua mensagem para o assistente...")
