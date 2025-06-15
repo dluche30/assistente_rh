@@ -152,6 +152,135 @@ Vagas disponíveis:
     st.error("❌ Não foi possível gerar a tabela após várias tentativas devido ao limite da API.")
     return "Erro: Limite da API OpenAI atingido."
 
+# ---- Funções placeholder para as novas análises ----
+def gerar_ranking_candidatos(curriculos_texto, vagas_texto, modelo_ia):
+    prompt = f"""
+Você é um assistente de RH. Com base nos currículos e nas vagas, gere um ranking dos candidatos para cada vaga, apresentando a ordem do mais ao menos aderente e uma breve justificativa.
+Currículos analisados:
+{curriculos_texto}
+
+Vagas disponíveis:
+{vagas_texto}
+"""
+    resposta = client.chat.completions.create(
+        model=modelo_ia,
+        messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
+                  {"role": "user", "content": prompt}]
+    )
+    return resposta.choices[0].message.content
+
+def gerar_analise_competencias(curriculos_texto, vagas_texto, modelo_ia):
+    prompt = f"""
+Você é um assistente de RH. Para cada vaga, crie uma tabela listando as principais competências requeridas, destacando para cada candidato quais competências estão presentes e quais faltam.
+Currículos analisados:
+{curriculos_texto}
+
+Vagas disponíveis:
+{vagas_texto}
+"""
+    resposta = client.chat.completions.create(
+        model=modelo_ia,
+        messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
+                  {"role": "user", "content": prompt}]
+    )
+    return resposta.choices[0].message.content
+
+def gerar_resumo_profissional(curriculos_texto, vagas_texto, modelo_ia):
+    prompt = f"""
+Você é um assistente de RH. Para cada candidato, gere um resumo personalizado destacando seus principais pontos fortes em relação às vagas disponíveis.
+Currículos analisados:
+{curriculos_texto}
+
+Vagas disponíveis:
+{vagas_texto}
+"""
+    resposta = client.chat.completions.create(
+        model=modelo_ia,
+        messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
+                  {"role": "user", "content": prompt}]
+    )
+    return resposta.choices[0].message.content
+
+def detectar_palavras_chave(curriculos_texto, vagas_texto, modelo_ia):
+    prompt = f"""
+Você é um assistente de RH. Identifique as palavras-chave técnicas e comportamentais (soft skills) mais recorrentes nos currículos, comparando com as palavras-chave das vagas.
+Currículos analisados:
+{curriculos_texto}
+
+Vagas disponíveis:
+{vagas_texto}
+"""
+    resposta = client.chat.completions.create(
+        model=modelo_ia,
+        messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
+                  {"role": "user", "content": prompt}]
+    )
+    return resposta.choices[0].message.content
+
+def gerar_perguntas_entrevista(curriculos_texto, vagas_texto, modelo_ia):
+    prompt = f"""
+Você é um assistente de RH. Para cada candidato, sugira perguntas personalizadas para entrevista, baseando-se em lacunas ou pontos de destaque dos currículos em relação às vagas.
+Currículos analisados:
+{curriculos_texto}
+
+Vagas disponíveis:
+{vagas_texto}
+"""
+    resposta = client.chat.completions.create(
+        model=modelo_ia,
+        messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
+                  {"role": "user", "content": prompt}]
+    )
+    return resposta.choices[0].message.content
+
+def apontar_riscos_alertas(curriculos_texto, vagas_texto, modelo_ia):
+    prompt = f"""
+Você é um assistente de RH. Liste possíveis incompatibilidades, como ausência de requisitos obrigatórios, experiência insuficiente ou inconsistências nos currículos em relação às vagas.
+Currículos analisados:
+{curriculos_texto}
+
+Vagas disponíveis:
+{vagas_texto}
+"""
+    resposta = client.chat.completions.create(
+        model=modelo_ia,
+        messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
+                  {"role": "user", "content": prompt}]
+    )
+    return resposta.choices[0].message.content
+
+def analisar_expectativa_salarial(curriculos_texto, vagas_texto, modelo_ia):
+    prompt = f"""
+Você é um assistente de RH. (Se a informação existir nos currículos) Apresente e compare as expectativas salariais dos candidatos com o orçamento das vagas.
+Currículos analisados:
+{curriculos_texto}
+
+Vagas disponíveis:
+{vagas_texto}
+"""
+    resposta = client.chat.completions.create(
+        model=modelo_ia,
+        messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
+                  {"role": "user", "content": prompt}]
+    )
+    return resposta.choices[0].message.content
+
+def analisar_diversidade(curriculos_texto, vagas_texto, modelo_ia):
+    prompt = f"""
+Você é um assistente de RH. (Se disponível nos dados dos currículos) Gera indicadores de diversidade de gênero, idade e formação dos candidatos.
+Currículos analisados:
+{curriculos_texto}
+
+Vagas disponíveis:
+{vagas_texto}
+"""
+    resposta = client.chat.completions.create(
+        model=modelo_ia,
+        messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
+                  {"role": "user", "content": prompt}]
+    )
+    return resposta.choices[0].message.content
+
 # ----------------------------------------------------------------------
 # ESTADO INICIAL
 # ----------------------------------------------------------------------
@@ -227,7 +356,7 @@ st.divider()
 mostrar_historico()
 st.divider()
 
-# ---- Geração de Tabela de Aderência ----
+# ---- Tabela de Aderência (botão rápido) ----
 st.subheader("📊 Análise de Aderência Currículo vs Vagas")
 if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia_principal"):
     if not st.session_state.texto_curriculos or not st.session_state.texto_vagas:
@@ -241,6 +370,39 @@ if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia_principal")
             )
             st.subheader("🔍 Resultado da Análise de Aderência")
             st.markdown(tabela)
+
+# ---- Análises Avançadas: Dropdown e botão de executar ----
+st.subheader("📈 Análises Avançadas")
+
+analises_disponiveis = {
+    "Ranking dos Candidatos": gerar_ranking_candidatos,
+    "Análise de Competências": gerar_analise_competencias,
+    "Resumo Profissional": gerar_resumo_profissional,
+    "Palavras-chave/Soft Skills": detectar_palavras_chave,
+    "Perguntas para Entrevista": gerar_perguntas_entrevista,
+    "Riscos/Alertas de Incompatibilidade": apontar_riscos_alertas,
+    "Expectativa Salarial": analisar_expectativa_salarial,
+    "Diversidade": analisar_diversidade,
+}
+
+analise_escolhida = st.selectbox(
+    "Selecione o tipo de análise:",
+    options=list(analises_disponiveis.keys()),
+    key="analise_avancada_selectbox"
+)
+
+if st.button("Executar Análise Avançada", key="botao_analise_avancada"):
+    if not st.session_state.texto_curriculos or not st.session_state.texto_vagas:
+        st.warning("Por favor, carregue currículos e vagas antes de gerar a análise.")
+    else:
+        with st.spinner(f"Executando análise: {analise_escolhida}..."):
+            resultado = analises_disponiveis[analise_escolhida](
+                st.session_state.texto_curriculos,
+                st.session_state.texto_vagas,
+                modelo_ia
+            )
+            st.subheader(f"🔍 Resultado da Análise: {analise_escolhida}")
+            st.markdown(resultado)
 
 # ---- Campo de entrada do usuário (chat) ----
 prompt_usuario = st.chat_input("Digite sua mensagem para o assistente...")
