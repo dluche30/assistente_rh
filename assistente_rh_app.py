@@ -96,6 +96,17 @@ def mostrar_historico():
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
+def registrar_log_acao(usuario_nome, acao, resultado):
+    try:
+        sheet.append_row([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            usuario_nome,
+            acao,
+            resultado[:3000] if resultado else ""  # Google Sheets limita ~50k caracteres por célula
+        ])
+    except Exception as e:
+        logging.error("Erro ao registrar log de ação: %s", e, exc_info=True)
+
 def processar_entrada(prompt_usuario: str):
     atualizar_prompt()
     st.session_state.mensagens.append({"role": "user", "content": prompt_usuario})
@@ -107,12 +118,12 @@ def processar_entrada(prompt_usuario: str):
         conteudo = resposta.choices[0].message.content
         st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
 
-        sheet.append_row([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        # Registra no log
+        registrar_log_acao(
             st.session_state.usuario_nome,
-            prompt_usuario,
-            conteudo,
-        ])
+            "Chat",
+            f"Pergunta: {prompt_usuario}\nResposta: {conteudo}"
+        )
     except Exception as e:
         logging.error("Erro na chamada ao modelo: %s", e, exc_info=True)
         st.session_state.mensagens.append({
@@ -392,6 +403,11 @@ if st.button("🔍 Gerar Tabela de Aderência", key="botao_aderencia_principal")
             )
             st.subheader("🔍 Resultado da Análise de Aderência")
             st.markdown(tabela)
+            registrar_log_acao(
+                st.session_state.usuario_nome,
+                "Análise de Aderência",
+                tabela
+            )
 
 # ---- Análises Avançadas: Dropdown e botão de executar ----
 st.subheader("📈 Análises Avançadas")
@@ -425,6 +441,11 @@ if st.button("Executar Análise Avançada", key="botao_analise_avancada"):
             )
             st.subheader(f"🔍 Resultado da Análise: {analise_escolhida}")
             st.markdown(resultado)
+            registrar_log_acao(
+                st.session_state.usuario_nome,
+                f"Análise Avançada: {analise_escolhida}",
+                resultado
+            )
 
 # ---- Campo de entrada do usuário (chat) ----
 prompt_usuario = st.chat_input("Digite sua mensagem para o assistente...")
