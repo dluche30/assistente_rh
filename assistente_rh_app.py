@@ -1,4 +1,3 @@
-
 import streamlit as st
 from openai import OpenAI
 import os, json, io, logging
@@ -164,7 +163,7 @@ if "mensagens" not in st.session_state:
     atualizar_prompt()
 
 # ----------------------------------------------------------------------
-# SIDEBAR - CONFIGURAÇÕES E UPLOADS
+# SIDEBAR - CONFIGURAÇÕES, UPLOAD E SELEÇÃO DE CURRÍCULOS
 # ----------------------------------------------------------------------
 with st.sidebar:
     st.image("logo_unesp.png", width=200)
@@ -187,6 +186,29 @@ with st.sidebar:
     if file_uploaded and st.button("🚀 Enviar", key="enviar_curriculo_sidebar"):
         upload_curriculo(file_uploaded)
 
+    # ---- Seleção de Currículos para Análise ----
+    st.subheader("📄 Selecionar currículos para análise")
+    curriculos = listar_curriculos_drive()
+    nomes = [c["name"] for c in curriculos]
+    selecionados = st.multiselect("Selecione currículos:", nomes, key="multiselect_curriculos_sidebar")
+    col_le, col_to = st.columns(2)
+    with col_le:
+        if st.button("🔍 Ler selecionados", key="botao_ler_selecionados_sidebar"):
+            if not selecionados:
+                st.warning("Selecione pelo menos um currículo.")
+            else:
+                for nome in selecionados:
+                    file_id = next(c["id"] for c in curriculos if c["name"] == nome)
+                    ler_curriculo_drive(file_id, nome)
+                atualizar_prompt()
+                st.success("Currículos lidos e armazenados na memória!")
+    with col_to:
+        if st.button("📥 Ler TODOS", key="botao_ler_todos_sidebar"):
+            for c in curriculos:
+                ler_curriculo_drive(c["id"], c["name"])
+            atualizar_prompt()
+            st.success("Todos os currículos lidos!")
+
     st.subheader("📑 Vagas disponíveis (CSV local)")
     try:
         vagas_df = pd.read_csv("vagas_exemplo.csv")
@@ -204,28 +226,6 @@ st.title("Assistente Virtual de Recrutamento")
 st.divider()
 mostrar_historico()
 st.divider()
-
-st.subheader("📄 Currículos no Google Drive")
-curriculos = listar_curriculos_drive()
-nomes = [c["name"] for c in curriculos]
-selecionados = st.multiselect("Selecione currículos para análise:", nomes, key="multiselect_curriculos")
-col_le, col_to = st.columns(2)
-with col_le:
-    if st.button("🔍 Ler currículos selecionados", key="botao_ler_selecionados"):
-        if not selecionados:
-            st.warning("Selecione pelo menos um currículo.")
-        else:
-            for nome in selecionados:
-                file_id = next(c["id"] for c in curriculos if c["name"] == nome)
-                ler_curriculo_drive(file_id, nome)
-            atualizar_prompt()
-            st.success("Currículos lidos e armazenados na memória!")
-with col_to:
-    if st.button("📥 Ler TODOS os currículos", key="botao_ler_todos"):
-        for c in curriculos:
-            ler_curriculo_drive(c["id"], c["name"])
-        atualizar_prompt()
-        st.success("Todos os currículos lidos!")
 
 # ---- Geração de Tabela de Aderência ----
 st.subheader("📊 Análise de Aderência Currículo vs Vagas")
