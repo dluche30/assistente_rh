@@ -79,12 +79,18 @@ def upload_curriculo(file_uploaded):
     )
 
 def atualizar_prompt():
-    preambulo = (
-        "Você é um assistente virtual de RH. Ajude na análise de currículos de múltiplos candidatos, gerando tabelas de aderência, cruzamento com vagas, resumos e sugestões de ocupação. \n\n"
-        f"Informações dos currículos analisados:\n{st.session_state.texto_curriculos}\n\n"
+    base_preambulo = (
+        "Você é um assistente virtual de RH. Ajude na análise de currículos de múltiplos candidatos, gerando tabelas de aderência, cruzamento com vagas, resumos e sugestões de ocupação."
+    )
+    # Adiciona o complemento do usuário, se houver
+    complemento = st.session_state.get("custom_preamble_sidebar", "").strip()
+    if complemento:
+        base_preambulo += f"\n\nInstrução personalizada do usuário: {complemento}"
+    base_preambulo += (
+        f"\n\nInformações dos currículos analisados:\n{st.session_state.texto_curriculos}\n\n"
         f"As vagas disponíveis são:\n{st.session_state.texto_vagas}"
     )
-    st.session_state.mensagens[0]["content"] = preambulo
+    st.session_state.mensagens[0]["content"] = base_preambulo
 
 def mostrar_historico():
     for msg in st.session_state.mensagens[1:]:
@@ -305,6 +311,12 @@ with st.sidebar:
         st.warning("Por favor, preencha seu nome para iniciar.")
         st.stop()
     st.session_state.usuario_nome = usuario_nome
+
+    st.subheader("📝 Personalize o Assistente")
+    custom_preamble = st.text_area(
+        "Complemento opcional ao preâmbulo do assistente (ex: priorize experiência em projetos, foco em inglês fluente, etc):",
+        key="custom_preamble_sidebar"
+    )
 
     st.subheader("📑 Vagas disponíveis (CSV local)")
     try:
