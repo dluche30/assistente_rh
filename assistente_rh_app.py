@@ -157,11 +157,25 @@ def processar_entrada(prompt_usuario: str):
             conteudo,
         ])
     
+try:
+    tabela_markdown = extrair_tabela_markdown(tabela)
+    if tabela_markdown:
+        df_aderencia = tabela_markdown_para_df(tabela_markdown)
+        if df_aderencia.shape[1] > 2:
+            st.subheader("🔍 Resultado da Análise de Aderência")
+            st.dataframe(df_aderencia)
+            st.subheader("📈 Gráfico de Radar")
+            plot_radar_aderencia(df_aderencia)
+        else:
+            st.warning("Tabela convertida tem só 1 coluna útil. Reveja a formatação da tabela de aderência.")
+    else:
+        st.warning("Tabela de aderência não encontrada no texto do assistente. Peça para a IA retornar apenas a tabela markdown, sem legenda ou texto extra.")
 except Exception as e:
     st.warning(f"Não foi possível gerar o gráfico de radar automaticamente: {e}")
-    if 'tabela_markdown' in locals() and tabela_markdown:        st.markdown(tabela_markdown)
-    else:        st.info("Nenhuma tabela de aderência foi retornada pelo assistente.")
-
+    if 'tabela_markdown' in locals() and tabela_markdown:
+        st.markdown(tabela_markdown)
+    else:
+        st.info("Nenhuma tabela de aderência foi retornada pelo assistente.")
 
 
 
