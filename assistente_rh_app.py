@@ -82,7 +82,6 @@ def atualizar_prompt():
     base_preambulo = (
         "Você é um assistente virtual de RH. Ajude na análise de currículos de múltiplos candidatos, gerando tabelas de aderência, cruzamento com vagas, resumos e sugestões de ocupação."
     )
-    # Adiciona o complemento do usuário, se houver
     complemento = st.session_state.get("custom_preamble_sidebar", "").strip()
     if complemento:
         base_preambulo += f"\n\nInstrução personalizada do usuário: {complemento}"
@@ -98,8 +97,8 @@ def mostrar_historico():
             st.markdown(msg["content"])
 
 def processar_entrada(prompt_usuario: str):
-    st.session_state.mensagens.append({"role": "user", "content": prompt_usuario})
     atualizar_prompt()
+    st.session_state.mensagens.append({"role": "user", "content": prompt_usuario})
     try:
         resposta = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -138,10 +137,10 @@ Currículos analisados:
 Vagas disponíveis:
 {vagas_texto}
 """
-
     tentativas = 5
     for tentativa in range(tentativas):
         try:
+            atualizar_prompt()
             resposta = client.chat.completions.create(
                 model=modelo_ia,
                 messages=[
@@ -158,7 +157,6 @@ Vagas disponíveis:
     st.error("❌ Não foi possível gerar a tabela após várias tentativas devido ao limite da API.")
     return "Erro: Limite da API OpenAI atingido."
 
-# ---- Funções placeholder para as novas análises ----
 def gerar_ranking_candidatos(curriculos_texto, vagas_texto, modelo_ia):
     prompt = f"""
 Você é um assistente de RH. Com base nos currículos e nas vagas, gere um ranking dos candidatos para cada vaga, apresentando a ordem do mais ao menos aderente e uma breve justificativa.
@@ -168,6 +166,7 @@ Currículos analisados:
 Vagas disponíveis:
 {vagas_texto}
 """
+    atualizar_prompt()
     resposta = client.chat.completions.create(
         model=modelo_ia,
         messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
@@ -184,6 +183,7 @@ Currículos analisados:
 Vagas disponíveis:
 {vagas_texto}
 """
+    atualizar_prompt()
     resposta = client.chat.completions.create(
         model=modelo_ia,
         messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
@@ -200,6 +200,7 @@ Currículos analisados:
 Vagas disponíveis:
 {vagas_texto}
 """
+    atualizar_prompt()
     resposta = client.chat.completions.create(
         model=modelo_ia,
         messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
@@ -216,6 +217,7 @@ Currículos analisados:
 Vagas disponíveis:
 {vagas_texto}
 """
+    atualizar_prompt()
     resposta = client.chat.completions.create(
         model=modelo_ia,
         messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
@@ -232,6 +234,7 @@ Currículos analisados:
 Vagas disponíveis:
 {vagas_texto}
 """
+    atualizar_prompt()
     resposta = client.chat.completions.create(
         model=modelo_ia,
         messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
@@ -248,6 +251,7 @@ Currículos analisados:
 Vagas disponíveis:
 {vagas_texto}
 """
+    atualizar_prompt()
     resposta = client.chat.completions.create(
         model=modelo_ia,
         messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
@@ -264,6 +268,7 @@ Currículos analisados:
 Vagas disponíveis:
 {vagas_texto}
 """
+    atualizar_prompt()
     resposta = client.chat.completions.create(
         model=modelo_ia,
         messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
@@ -280,6 +285,7 @@ Currículos analisados:
 Vagas disponíveis:
 {vagas_texto}
 """
+    atualizar_prompt()
     resposta = client.chat.completions.create(
         model=modelo_ia,
         messages=[{"role": "system", "content": st.session_state.mensagens[0]["content"]},
@@ -317,6 +323,7 @@ with st.sidebar:
         "Complemento opcional ao preâmbulo do assistente (ex: priorize experiência em projetos, foco em inglês fluente, etc):",
         key="custom_preamble_sidebar"
     )
+    st.caption("⚡ O texto personalizado será considerado automaticamente na próxima análise ou mensagem enviada, sem necessidade de recarregar a página.")
 
     st.subheader("📑 Vagas disponíveis (CSV local)")
     try:
