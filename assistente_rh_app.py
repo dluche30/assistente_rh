@@ -292,30 +292,29 @@ if "mensagens" not in st.session_state:
     atualizar_prompt()
 
 # ----------------------------------------------------------------------
-# SIDEBAR - CONFIGURAÇÕES, UPLOAD E SELEÇÃO DE CURRÍCULOS
+# SIDEBAR ORGANIZADA
 # ----------------------------------------------------------------------
 with st.sidebar:
     st.image("logo_unesp.png", width=200)
-    st.header("Configurações")
-    modelo_ia = st.selectbox(
-        "Escolha o modelo de IA para análise:",
-        options=["gpt-4", "gpt-3.5-turbo"],
-        index=1,
-        key="selecao_modelo_sidebar"
+    st.markdown(
+        "<div style='font-size:18px; font-weight:bold; margin-bottom: 12px;'>Prof. Dra. Claudia Regina de Freitas</div>",
+        unsafe_allow_html=True
     )
-
     usuario_nome = st.text_input("Digite seu nome completo:", key="nome_usuario_input_sidebar")
     if not usuario_nome:
         st.warning("Por favor, preencha seu nome para iniciar.")
         st.stop()
     st.session_state.usuario_nome = usuario_nome
 
-    st.subheader("📤 Enviar novo currículo (PDF) para o Google Drive")
-    file_uploaded = st.file_uploader("Selecione o arquivo", type=["pdf"], key="upload_curriculo_sidebar")
-    if file_uploaded and st.button("🚀 Enviar", key="enviar_curriculo_sidebar"):
-        upload_curriculo(file_uploaded)
+    st.subheader("📑 Vagas disponíveis (CSV local)")
+    try:
+        vagas_df = pd.read_csv("vagas_exemplo.csv")
+        st.dataframe(vagas_df)
+        st.session_state.texto_vagas = vagas_df.to_string(index=False)
+    except Exception:
+        st.warning("Arquivo de vagas não encontrado.")
+        st.session_state.texto_vagas = ""
 
-    # ---- Seleção de Currículos para Análise ----
     st.subheader("📄 Selecionar currículos para análise")
     curriculos = listar_curriculos_drive()
     nomes = [c["name"] for c in curriculos]
@@ -338,14 +337,18 @@ with st.sidebar:
             atualizar_prompt()
             st.success("Todos os currículos lidos!")
 
-    st.subheader("📑 Vagas disponíveis (CSV local)")
-    try:
-        vagas_df = pd.read_csv("vagas_exemplo.csv")
-        st.dataframe(vagas_df)
-        st.session_state.texto_vagas = vagas_df.to_string(index=False)
-    except Exception:
-        st.warning("Arquivo de vagas não encontrado.")
-        st.session_state.texto_vagas = ""
+    st.subheader("📤 Enviar novo currículo (PDF) para o Google Drive")
+    file_uploaded = st.file_uploader("Selecione o arquivo", type=["pdf"], key="upload_curriculo_sidebar")
+    if file_uploaded and st.button("🚀 Enviar", key="enviar_curriculo_sidebar"):
+        upload_curriculo(file_uploaded)
+
+    st.header("Configurações Avançadas")
+    modelo_ia = st.selectbox(
+        "Escolha o modelo de IA para análise:",
+        options=["gpt-4", "gpt-3.5-turbo"],
+        index=1,
+        key="selecao_modelo_sidebar"
+    )
 
 # ----------------------------------------------------------------------
 # PAINEL PRINCIPAL
